@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SHAT Task</title>
+  <script src="https://unpkg.com/jspsych@8.2.2"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
+  <link href="https://unpkg.com/jspsych@8.2.2/css/jspsych.css" rel="stylesheet" type="text/css" />
+  <style>
+    .arena-item:hover {
+      cursor: pointer;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body></body>
+<script>
+  const jsPsych = initJsPsych({
+    on_finish: () => jsPsych.data.displayData()
+  });
+
+  let timeline = [];
+
+  const rewardRanges = [
+    [1, 5], [5, 7], [10, 12], [15, 20], [20, 22], [25, 30], [30, 35], [35, 45]
+  ];
+
+  const fractalFilenames = [
+  
+'SHINEd_fractal_001.png',
+  'SHINEd_fractal_002.png',
+  'SHINEd_fractal_004.png',
+  'SHINEd_fractal_005.png',
+  'SHINEd_fractal_006.png',
+  'SHINEd_fractal_013.png',
+  'SHINEd_fractal_016.png',
+  'SHINEd_fractal_021.png',
+  'SHINEd_fractal_022.png',
+  'SHINEd_fractal_034.png',
+  'SHINEd_fractal_047.png',
+  'SHINEd_fractal_049.png',
+  'SHINEd_fractal_056.png',
+  'SHINEd_fractal_076.png',
+  'SHINEd_fractal_078.png',
+  'SHINEd_fractal_087.png',
+  'SHINEd_fractal_1005.png',
+  'SHINEd_fractal_1007.png',
+  'SHINEd_fractal_101.png',
+  'SHINEd_fractal_1013.png',
+  'SHINEd_fractal_1017.png',
+  'SHINEd_fractal_1018.png',
+  'SHINEd_fractal_1019.png',
+  'SHINEd_fractal_1020.png',
+  'SHINEd_fractal_1021.png',
+  'SHINEd_fractal_1022.png',
+  'SHINEd_fractal_1029.png',
+  'SHINEd_fractal_103.png',
+  'SHINEd_fractal_1046.png'
+  ];
+
+  let stimulus_pool = jsPsych.randomization.shuffle(
+    fractalFilenames.map(filename => ({
+      image: `stimuli_400_fractals/${filename}`,
+      unlocked: false,
+      reward_range: null
+    }))
+  );
+
+  let unlocked_stimuli = [];
+
+  timeline.push({
+    type: jsPsychPreload,
+    images: stimulus_pool.map(s => s.image)
+  });
+
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+      <p>Welcome to the experiment.</p>
+      <p>On each trial, you will see two images. One shows a known reward, and one is unknown (???).</p>
+      <p><strong>Press F</strong> to accept the known reward.</p>
+      <p><strong>Press J</strong> to reveal the unknown image's reward.</p>
+      <p>After several trials, you'll enter an Arena where you can choose from unlocked stimuli.</p>
+      <p>Press any key to begin.</p>
+    `
+  });
+
+  // First trial: unknown vs unknown to force learning
+  let unknown1 = stimulus_pool.find(s => !s.unlocked);
+  if (unknown1) unknown1.temp_locked = true;
+  let unknown2 = stimulus_pool.find(s => !s.unlocked && !s.temp_locked);
+
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+      <div style='display: flex; justify-content: space-around; align-items: center;'>
+        <div>
+          <img src='${unknown1.image}' width='150'><br>
+          <p>???</p>
+          <p><strong>F: CHOOSE</strong></p>
+        </div>
+        <div>
+          <img src='${unknown2.image}' width='150'><br>
+          <p>???</p>
+          <p><strong>J: CHOOSE</strong></p>
+        </div>
+      </div>
+    `,
+    choices: ['f', 'j'],
+    data: {
+      trial_type: 'forced_learning',
+      left_image: unknown1.image,
+      right_image: unknown2.image
+    },
+    on_finish: function(data){
+      const chosen = data.response === 'f' ? unknown1 : unknown2;
+      let assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
+      chosen.unlocked = true;
+      chosen.reward_range = assigned_range;
+      unlocked_stimuli.push(chosen);
+    }
+  });
+
+  // Main Trials: known vs unknown
+  for (let i = 0; i < 14; i++) {
+    let known = jsPsych.randomization.sampleWithoutReplacement(unlocked_stimuli, 1)[0];
+    let unknown = stimulus_pool.find(s => !s.unlocked);
+    if (!unknown) continue;
+
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <div style='display: flex; justify-content: space-around; align-items: center;'>
+          <div>
+            <img src='${known.image}' width='150'><br>
+            <p>${known.reward_range[0]}–${known.reward_range[1]} Points</p>
+            <p><strong>F: ACCEPT</strong></p>
+          </div>
+          <div>
+            <img src='${unknown.image}' width='150'><br>
+            <p>???</p>
+            <p><strong>J: REVEAL</strong></p>
+          </div>
+        </div>
+      `,
+      choices: ['f', 'j'],
+      data: {
+        trial_type: 'choice',
+        known_image: known.image,
+        known_range: known.reward_range,
+        unknown_image: unknown.image
+      },
+      on_finish: function(data){
+        if (data.response === 'j') {
+          let assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
+          unknown.unlocked = true;
+          unknown.reward_range = assigned_range;
+          unlocked_stimuli.push(unknown);
+          data.revealed = true;
+          data.assigned_range = assigned_range;
+        } else {
+          data.revealed = false;
+          let [min, max] = known.reward_range;
+          data.points_awarded = Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+      }
+    });
+  }
+
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: function() {
+      let known = stimulus_pool.filter(stim => stim.unlocked);
+      let html = `<div id="arena" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;">`;
+      known.forEach((stim, index) => {
+        html += `
+          <div class="arena-item" data-index="${index}" style="border: 3px solid transparent; padding: 5px;">
+            <img src="${stim.image}" width="100" />
+            <p style="text-align: center;">${stim.reward_range[0]}–${stim.reward_range[1]} pts</p>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      html += `<div id="arena-submit" style="text-align: center; margin-top: 20px; display: none;">
+        <button id="submit-selection">Submit</button>
+      </div>`;
+      return html;
+    },
+    choices: "NO_KEYS",
+    on_load: function() {
+      let selectedIndices = [];
+      document.querySelectorAll(".arena-item").forEach(item => {
+        item.addEventListener("click", () => {
+          const index = parseInt(item.dataset.index);
+          if (selectedIndices.includes(index)) {
+            selectedIndices = selectedIndices.filter(i => i !== index);
+            item.style.border = "3px solid transparent";
+          } else if (selectedIndices.length < 3) {
+            selectedIndices.push(index);
+            item.style.border = "3px solid green";
+          }
+          document.getElementById("arena-submit").style.display =
+            selectedIndices.length === 3 ? "block" : "none";
+        });
+      });
+      document.getElementById("submit-selection").addEventListener("click", () => {
+        let selected = selectedIndices.map(i => stimulus_pool.filter(stim => stim.unlocked)[i]);
+        let points = selected.map(stim => {
+          let [min, max] = stim.reward_range;
+          return Math.floor(Math.random() * (max - min + 1)) + min;
+        });
+        let totalPoints = points.reduce((a, b) => a + b, 0);
+        jsPsych.finishTrial({
+          selected_images: selected.map(s => s.image),
+          selected_ranges: selected.map(s => s.reward_range),
+          awarded_points: points,
+          total_points: totalPoints
+        });
+      });
+    }
+  });
+
+  timeline.push({
+    type: jsPsychHtmlButtonResponse,
+    stimulus: function() {
+      const last_data = jsPsych.data.get().last(1).values()[0];
+      return `
+        <p>You earned <strong>${last_data.total_points}</strong> points!</p>
+        <p>Click below to continue.</p>
+      `;
+    },
+    choices: ['Continue']
+  });
+
+  jsPsych.run(timeline);
+</script>
+</html>
