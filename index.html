@@ -109,7 +109,7 @@ timeline.push({
     for (let i = 0; i < 14; i++) {
       let known = jsPsych.randomization.sampleWithoutReplacement(unlocked_stimuli, 1)[0];
       let unknown = stimulus_pool.find(s => !s.unlocked);
-      if (!unknown) continue;
+      if (!unknown) break;
 
       timeline.push({
         type: jsPsychHtmlKeyboardResponse,
@@ -150,8 +150,11 @@ timeline.push({
         }
       });
     }
+
+    return Promise.resolve(); // ✅ makes sure jsPsych waits
   }
 });
+
 
 
   timeline.push({
