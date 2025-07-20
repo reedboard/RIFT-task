@@ -27,36 +27,14 @@
   ];
 
   const fractalFilenames = [
-  
-'SHINEd_fractal_001.png',
-  'SHINEd_fractal_002.png',
-  'SHINEd_fractal_004.png',
-  'SHINEd_fractal_005.png',
-  'SHINEd_fractal_006.png',
-  'SHINEd_fractal_013.png',
-  'SHINEd_fractal_016.png',
-  'SHINEd_fractal_021.png',
-  'SHINEd_fractal_022.png',
-  'SHINEd_fractal_034.png',
-  'SHINEd_fractal_047.png',
-  'SHINEd_fractal_049.png',
-  'SHINEd_fractal_056.png',
-  'SHINEd_fractal_076.png',
-  'SHINEd_fractal_078.png',
-  'SHINEd_fractal_087.png',
-  'SHINEd_fractal_1005.png',
-  'SHINEd_fractal_1007.png',
-  'SHINEd_fractal_101.png',
-  'SHINEd_fractal_1013.png',
-  'SHINEd_fractal_1017.png',
-  'SHINEd_fractal_1018.png',
-  'SHINEd_fractal_1019.png',
-  'SHINEd_fractal_1020.png',
-  'SHINEd_fractal_1021.png',
-  'SHINEd_fractal_1022.png',
-  'SHINEd_fractal_1029.png',
-  'SHINEd_fractal_103.png',
-  'SHINEd_fractal_1046.png'
+    'SHINEd_fractal_001.png', 'SHINEd_fractal_002.png', 'SHINEd_fractal_004.png', 'SHINEd_fractal_005.png',
+    'SHINEd_fractal_006.png', 'SHINEd_fractal_013.png', 'SHINEd_fractal_016.png', 'SHINEd_fractal_021.png',
+    'SHINEd_fractal_022.png', 'SHINEd_fractal_034.png', 'SHINEd_fractal_047.png', 'SHINEd_fractal_049.png',
+    'SHINEd_fractal_056.png', 'SHINEd_fractal_076.png', 'SHINEd_fractal_078.png', 'SHINEd_fractal_087.png',
+    'SHINEd_fractal_1005.png', 'SHINEd_fractal_1007.png', 'SHINEd_fractal_101.png', 'SHINEd_fractal_1013.png',
+    'SHINEd_fractal_1017.png', 'SHINEd_fractal_1018.png', 'SHINEd_fractal_1019.png', 'SHINEd_fractal_1020.png',
+    'SHINEd_fractal_1021.png', 'SHINEd_fractal_1022.png', 'SHINEd_fractal_1029.png', 'SHINEd_fractal_103.png',
+    'SHINEd_fractal_1046.png'
   ];
 
   let stimulus_pool = jsPsych.randomization.shuffle(
@@ -86,47 +64,50 @@
     `
   });
 
-  // First trial: unknown vs unknown to force learning
+  // === First trial: unknown vs unknown ===
   let unknown1 = stimulus_pool.find(s => !s.unlocked);
   if (unknown1) unknown1.temp_locked = true;
   let unknown2 = stimulus_pool.find(s => !s.unlocked && !s.temp_locked);
 
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-      <div style='display: flex; justify-content: space-around; align-items: center;'>
-        <div>
-          <img src='${unknown1.image}' width='150'><br>
-          <p>???</p>
-          <p><strong>F: CHOOSE</strong></p>
+  if (unknown1 && unknown2) {
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <div style='display: flex; justify-content: space-around; align-items: center;'>
+          <div>
+            <img src='${unknown1.image}' width='150'><br>
+            <p>???</p>
+            <p><strong>F: CHOOSE</strong></p>
+          </div>
+          <div>
+            <img src='${unknown2.image}' width='150'><br>
+            <p>???</p>
+            <p><strong>J: CHOOSE</strong></p>
+          </div>
         </div>
-        <div>
-          <img src='${unknown2.image}' width='150'><br>
-          <p>???</p>
-          <p><strong>J: CHOOSE</strong></p>
-        </div>
-      </div>
-    `,
-    choices: ['f', 'j'],
-    data: {
-      trial_type: 'forced_learning',
-      left_image: unknown1.image,
-      right_image: unknown2.image
-    },
-    on_finish: function(data){
-      const chosen = data.response === 'f' ? unknown1 : unknown2;
-      let assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
-      chosen.unlocked = true;
-      chosen.reward_range = assigned_range;
-      unlocked_stimuli.push(chosen);
-    }
-  });
+      `,
+      choices: ['f', 'j'],
+      data: {
+        trial_type: 'forced_learning',
+        left_image: unknown1.image,
+        right_image: unknown2.image
+      },
+      on_finish: function(data){
+        const chosen = data.response === 'f' ? unknown1 : unknown2;
+        const assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
+        chosen.unlocked = true;
+        chosen.reward_range = assigned_range;
+        unlocked_stimuli.push(chosen);
+      }
+    });
+  }
 
-  // Main Trials: known vs unknown
+  // === Main trials ===
   for (let i = 0; i < 14; i++) {
+    if (unlocked_stimuli.length === 0) break;
     let known = jsPsych.randomization.sampleWithoutReplacement(unlocked_stimuli, 1)[0];
     let unknown = stimulus_pool.find(s => !s.unlocked);
-    if (!unknown) continue;
+    if (!unknown || !known) continue;
 
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
@@ -153,7 +134,7 @@
       },
       on_finish: function(data){
         if (data.response === 'j') {
-          let assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
+          const assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
           unknown.unlocked = true;
           unknown.reward_range = assigned_range;
           unlocked_stimuli.push(unknown);
@@ -236,3 +217,4 @@
   jsPsych.run(timeline);
 </script>
 </html>
+
