@@ -93,13 +93,21 @@
       right_image: unknown2.image
     },
     on_finish: function(data){
-      const chosen = data.response === 'f' ? unknown1 : unknown2;
-      let assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
-      chosen.unlocked = true;
-      chosen.reward_range = assigned_range;
-      unlocked_stimuli.push(chosen);
-    }
+  const chosen = data.response === 'f' ? unknown1 : unknown2;
+  let assigned_range = jsPsych.randomization.sampleWithoutReplacement(rewardRanges, 1)[0];
+  chosen.unlocked = true;
+  chosen.reward_range = assigned_range;
+  unlocked_stimuli.push(chosen);
+
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+      <p>You revealed a reward range of <strong>${assigned_range[0]}–${assigned_range[1]}</strong> points!</p>
+      <p>Press any key to continue.</p>
+    `,
+    post_trial_gap: 250
   });
+}
 
   // Add trials after first forced-learning one
   timeline.push({
