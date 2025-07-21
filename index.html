@@ -252,12 +252,6 @@
         const known = jsPsych.randomization.sampleWithoutReplacement(available_unlocked, 1)[0];
         const unknown = jsPsych.randomization.sampleWithoutReplacement(available_unknown, 1)[0];
         
-        // Store current stimuli for the trial
-        jsPsych.data.addProperties({
-          current_known: known,
-          current_unknown: unknown
-        });
-        
         const knownHTML = `
           <div class="stimulus-option">
             ${createFractalHTML(known)}
@@ -275,21 +269,25 @@
         `;
 
         // Randomly assign side
-        const flip = Math.random() < 0.5; // true = known on left, false = known on right
-        const leftStim = flip ? knownHTML.replace("{{KEY}}", "F") : unknownHTML.replace("{{KEY}}", "F");
-        const rightStim = flip ? unknownHTML.replace("{{KEY}}", "J") : knownHTML.replace("{{KEY}}", "J");
+        const known_on_left = Math.random() < 0.5;
+        const leftStim = known_on_left ? knownHTML : unknownHTML;
+        const rightStim = known_on_left ? unknownHTML : knownHTML;
 
-        // Store what side each stimulus is on
-        jsPsych.data.addProperties({
-          known_on_left: flip
-        });
-
+        // Store trial info in data property for access in on_finish
         return `
           <div class="countdown-display">Trials to Arena: ${trialsLeft}</div>
           <div class="stimulus-container">
             ${leftStim}
             ${rightStim}
           </div>
+          <script>
+            // Store trial info in a way that on_finish can access
+            window.currentTrialInfo = {
+              known: ${JSON.stringify(known)},
+              unknown: ${JSON.stringify(unknown)},
+              known_on_left: ${known_on_left}
+            };
+          </script>
         `;
       },
       choices: ['f', 'j'],
@@ -298,34 +296,28 @@
         trial_number: i
       },
       on_finish: function(data) {
-        const props = jsPsych.data.get().last(1).values()[0];
-        const known = props.current_known;
-        const unknown = props.current_unknown;
+        const trialInfo = window.currentTrialInfo;
         
-        if (!known || !unknown) {
-          data.error = "Missing stimulus data";
+        if (!trialInfo || !trialInfo.known || !trialInfo.unknown) {
+          data.error = "Missing trial info";
           return;
         }
+        
+        const known = trialInfo.known;
+        const unknown = trialInfo.unknown;
+        const known_on_left = trialInfo.known_on_left;
         
         data.known_stimulus = known.id;
         data.known_range = known.reward_range;
         data.unknown_stimulus = unknown.id;
+        data.known_on_left = known_on_left;
         
-        if (data.response === 'j') {
-          // Chose to reveal unknown
-          const assigned_range = assignRewardRange();
-          unknown.unlocked = true;
-          unknown.reward_range = assigned_range;
-          unlocked_stimuli.push(unknown);
-          
-          data.choice = 'reveal';
-          data.revealed = true;
-          data.assigned_range = assigned_range;
-          data.points_awarded = 0;
-          
-          console.log(`Trial ${i}: Revealed ${unknown.id} with range [${assigned_range[0]}, ${assigned_range[1]}]`);
-        } else {
-          // Chose known reward
+        // Determine what was actually chosen based on key press and layout
+        const chose_left = (data.response === 'f');
+        const chose_known = (chose_left && known_on_left) || (!chose_left && !known_on_left);
+        
+        if (chose_known) {
+          // Chose the known reward
           const [min, max] = known.reward_range;
           const points = Math.floor(Math.random() * (max - min + 1)) + min;
           
@@ -334,6 +326,24 @@
           data.points_awarded = points;
           
           console.log(`Trial ${i}: Accepted ${known.id}, awarded ${points} points`);
+        } else {
+          // Chose to reveal unknown
+          const assigned_range = assignRewardRange();
+          
+          // Find the unknown stimulus in the learning_stimuli array and update it
+          const unknownStimIndex = learning_stimuli.findIndex(s => s.id === unknown.id);
+          if (unknownStimIndex !== -1) {
+            learning_stimuli[unknownStimIndex].unlocked = true;
+            learning_stimuli[unknownStimIndex].reward_range = assigned_range;
+            unlocked_stimuli.push(learning_stimuli[unknownStimIndex]);
+          }
+          
+          data.choice = 'reveal';
+          data.revealed = true;
+          data.assigned_range = assigned_range;
+          data.points_awarded = 0;
+          
+          console.log(`Trial ${i}: Revealed ${unknown.id} with range [${assigned_range[0]}, ${assigned_range[1]}]`);
         }
       }
     });
