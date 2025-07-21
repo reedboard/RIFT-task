@@ -161,7 +161,7 @@
         <h2>RIFT Task</h2>
         <p>Choose between known and unknown reward options. Known options show point ranges, unknown options show "???" but reveal their value when selected.</p>
         <p><strong>Press F for LEFT, J for RIGHT</strong></p>
-        <p>After 21 trials, you'll enter <strong>the Arena.<strong></p>
+        <p>After 21 trials, you'll enter <strong>the Arena.</strong></p>
         <p><strong>Press any key to begin</strong></p>
       </div>
     `,
@@ -252,17 +252,21 @@
         const known = jsPsych.randomization.sampleWithoutReplacement(available_unlocked, 1)[0];
         const unknown = jsPsych.randomization.sampleWithoutReplacement(available_unknown, 1)[0];
         
-        // Store current stimuli for the trial
+        // Randomly assign side (true = known on left, false = known on right)
+        const known_on_left = Math.random() < 0.5;
+        
+        // Store current trial info for use in on_finish
         jsPsych.data.addProperties({
           current_known: known,
-          current_unknown: unknown
+          current_unknown: unknown,
+          known_on_left: known_on_left
         });
         
         const knownHTML = `
           <div class="stimulus-option">
             ${createFractalHTML(known)}
             <p style="font-size: 16px; font-weight: bold;">${known.reward_range[0]}–${known.reward_range[1]} Points</p>
-            <p><strong> ACCEPT </strong></p>
+            <p><strong>ACCEPT</strong></p>
           </div>
         `;
         
@@ -270,19 +274,13 @@
           <div class="stimulus-option">
             ${createFractalHTML(unknown)}
             <p style="font-size: 18px; font-weight: bold;">???</p>
-            <p><strong> REVEAL </strong></p>
+            <p><strong>REVEAL</strong></p>
           </div>
         `;
 
-        // Randomly assign side
-        const flip = Math.random() < 0.5; // true = known on left, false = known on right
-        const leftStim = flip ? knownHTML.replace("{{KEY}}", "F") : unknownHTML.replace("{{KEY}}", "F");
-        const rightStim = flip ? unknownHTML.replace("{{KEY}}", "J") : knownHTML.replace("{{KEY}}", "J");
-
-        // Store what side each stimulus is on
-        jsPsych.data.addProperties({
-          known_on_left: flip
-        });
+        // Assign stimuli to sides based on random assignment
+        const leftStim = known_on_left ? knownHTML : unknownHTML;
+        const rightStim = known_on_left ? unknownHTML : knownHTML;
 
         return `
           <div class="countdown-display">Trials to Arena: ${trialsLeft}</div>
@@ -290,6 +288,7 @@
             ${leftStim}
             ${rightStim}
           </div>
+          <p style="text-align: center; margin-top: 20px;"><strong>Press F for LEFT, J for RIGHT</strong></p>
         `;
       },
       choices: ['f', 'j'],
@@ -301,6 +300,7 @@
         const props = jsPsych.data.get().last(1).values()[0];
         const known = props.current_known;
         const unknown = props.current_unknown;
+        const known_on_left = props.known_on_left;
         
         if (!known || !unknown) {
           data.error = "Missing stimulus data";
@@ -310,8 +310,24 @@
         data.known_stimulus = known.id;
         data.known_range = known.reward_range;
         data.unknown_stimulus = unknown.id;
+        data.known_on_left = known_on_left;
         
-        if (data.response === 'j') {
+        // Determine what was chosen based on key press and stimulus positions
+        const chose_left = data.response === 'f';
+        const chose_known = (chose_left && known_on_left) || (!chose_left && !known_on_left);
+        
+        if (chose_known) {
+          // Chose known reward - award points
+          const [min, max] = known.reward_range;
+          const points = Math.floor(Math.random() * (max - min + 1)) + min;
+          
+          data.choice = 'accept';
+          data.chosen_stimulus = known.id;
+          data.revealed = false;
+          data.points_awarded = points;
+          
+          console.log(`Trial ${i}: Accepted ${known.id}, awarded ${points} points`);
+        } else {
           // Chose to reveal unknown
           const assigned_range = assignRewardRange();
           unknown.unlocked = true;
@@ -319,57 +335,48 @@
           unlocked_stimuli.push(unknown);
           
           data.choice = 'reveal';
+          data.chosen_stimulus = unknown.id;
           data.revealed = true;
           data.assigned_range = assigned_range;
           data.points_awarded = 0;
           
           console.log(`Trial ${i}: Revealed ${unknown.id} with range [${assigned_range[0]}, ${assigned_range[1]}]`);
-        } else {
-          // Chose known reward
-          const [min, max] = known.reward_range;
-          const points = Math.floor(Math.random() * (max - min + 1)) + min;
-          
-          data.choice = 'accept';
-          data.revealed = false;
-          data.points_awarded = points;
-          
-          console.log(`Trial ${i}: Accepted ${known.id}, awarded ${points} points`);
         }
       }
     });
 
     // Feedback after each trial
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: function() {
-      const lastTrial = jsPsych.data.get().last(1).values()[0];
-      let feedback = "";
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        const lastTrial = jsPsych.data.get().last(1).values()[0];
+        let feedback = "";
 
-      if (lastTrial.choice === 'reveal') {
-        const range = lastTrial.assigned_range;
-        feedback = `
-          <div style="text-align: center;">
-            <h3>New Fractal Unlocked!</h3>
-            <p>This fractal will give you <strong>${range[0]} to ${range[1]} points</strong> in future trials.</p>
-            <p>You gained <strong>0 points</strong> this trial.</p>
-          </div>
-        `;
-      } else {
-        feedback = `
-          <div style="text-align: center;">
-            <h3>Reward Collected!</h3>
-            <p>You earned <strong>${lastTrial.points_awarded} points</strong> this trial.</p>
-          </div>
-        `;
-      }
+        if (lastTrial.choice === 'reveal') {
+          const range = lastTrial.assigned_range;
+          feedback = `
+            <div style="text-align: center;">
+              <h3>New Fractal Unlocked!</h3>
+              <p>This fractal will give you <strong>${range[0]} to ${range[1]} points</strong> in future trials.</p>
+              <p>You gained <strong>0 points</strong> this trial.</p>
+            </div>
+          `;
+        } else {
+          feedback = `
+            <div style="text-align: center;">
+              <h3>Reward Collected!</h3>
+              <p>You earned <strong>${lastTrial.points_awarded} points</strong> this trial.</p>
+            </div>
+          `;
+        }
 
-      return feedback;
-    },
-    choices: "NO_KEYS",          //  prevent keypresses
-    trial_duration: 1500         // fixed duration in ms
-  });
-
+        return feedback;
+      },
+      choices: "NO_KEYS",
+      trial_duration: 1500
+    });
   }
+
   // Arena instructions
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
@@ -457,9 +464,11 @@
             selectedItems = selectedItems.filter(si => si.id !== itemId);
             item.classList.remove('selected');
           } else if (selectedItems.length < 3) {
-            // Select
-            if (!stimulus.unlocked) 
-            
+            // Select - if unknown, reveal points
+            if (!stimulus.unlocked) {
+              document.getElementById(`points-${index}`).textContent = 
+                `${stimulus.reward_range[0]}–${stimulus.reward_range[1]} pts`;
+            }
             
             selectedItems.push({
               id: itemId,
