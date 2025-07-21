@@ -396,7 +396,7 @@
 
   // Arena trial
   // Shuffle once and reuse
-  let arena_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
+  let arena_stimuli = jsPsych.randomization.shuffle(all_stimuli);
 
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
@@ -467,41 +467,52 @@
         });
       });
 
-      document.getElementById("submit-selection").addEventListener("click", () => {
-        document.querySelectorAll(".arena-fractal").forEach(item => item.style.pointerEvents = "none");
-        document.getElementById("submit-selection").disabled = true;
+     document.getElementById("submit-selection").addEventListener("click", () => {
+      // Disable interaction after submission
+      document.querySelectorAll(".arena-fractal").forEach(item => item.style.pointerEvents = "none");
+      document.getElementById("submit-selection").disabled = true;
 
-        const awardedPoints = [];
-        const selected_was_known = [];
-        const selected_ranges = [];
-        const selected_ids = [];
+      const selected_ids = [];
+      const selected_ranges = [];
+      const selected_was_known = [];
+      const awarded_points = [];
 
-        selectedItems.forEach(({ stim, index }) => {
-          if (!stim.unlocked) {
-            stim.reward_range = assignRewardRange();
-            stim.unlocked = true;
-          }
+      selectedItems.forEach(({ stim }) => {
+        // Safety check: assign reward if missing or invalid
+        if (
+          !stim.reward_range ||
+          stim.reward_range.length !== 2 ||
+          typeof stim.reward_range[0] !== "number"
+        ) {
+          stim.reward_range = assignRewardRange();
+        }
 
-          const [min, max] = stim.reward_range;
-          const points = Math.floor(Math.random() * (max - min + 1)) + min;
+        // Draw points within range
+        const [min, max] = stim.reward_range;
+        const points = Math.floor(Math.random() * (max - min + 1)) + min;
 
-          awardedPoints.push(points);
-          selected_was_known.push(stim.available_for_learning); // or `stim.unlocked` if you prefer
-          selected_ranges.push(stim.reward_range);
-          selected_ids.push(stim.id);
-        });
+        //  Save everything for data
+        selected_ids.push(stim.id);
+        selected_ranges.push(stim.reward_range);
+        selected_was_known.push(stim.unlocked);
+        awarded_points.push(points);
 
-        const totalPoints = awardedPoints.reduce((a, b) => a + b, 0);
-
-        jsPsych.finishTrial({
-          trial_type: 'arena',
-          selected_stimuli: selected_ids,
-          selected_was_known: selected_was_known,
-          selected_ranges: selected_ranges,
-          awarded_points: awardedPoints,
-          total_points: totalPoints
-        });
+        //  Mark as unlocked for future use
+        stim.unlocked = true;
       });
+
+      const totalPoints = awarded_points.reduce((a, b) => a + b, 0);
+
+      // Finish the Arena trial with all info
+      jsPsych.finishTrial({
+        trial_type: 'arena',
+        selected_stimuli: selected_ids,
+        selected_was_known: selected_was_known,
+        selected_ranges: selected_ranges,
+        awarded_points: awarded_points,
+        total_points: totalPoints
+      });
+    });
     }
 
   });
