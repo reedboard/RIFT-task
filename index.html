@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -161,7 +162,7 @@
         <h2>RIFT Task</h2>
         <p>Choose between known and unknown reward options. Known options show point ranges, unknown options show "???" but reveal their value when selected.</p>
         <p><strong>Press F for LEFT, J for RIGHT</strong></p>
-        <p>After 21 trials, you'll enter <strong>the Arena.<strong></p>
+        <p>After 21 trials, you'll enter <strong>the Arena.</strong></p>
         <p><strong>Press any key to begin</strong></p>
       </div>
     `,
@@ -349,37 +350,37 @@
     });
 
     // Feedback after each trial
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: function() {
-      const lastTrial = jsPsych.data.get().last(1).values()[0];
-      let feedback = "";
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        const lastTrial = jsPsych.data.get().last(1).values()[0];
+        let feedback = "";
 
-      if (lastTrial.choice === 'reveal') {
-        const range = lastTrial.assigned_range;
-        feedback = `
-          <div style="text-align: center;">
-            <h3>New Fractal Unlocked!</h3>
-            <p>This fractal will give you <strong>${range[0]} to ${range[1]} points</strong> in future trials.</p>
-            <p>You gained <strong>0 points</strong> this trial.</p>
-          </div>
-        `;
-      } else {
-        feedback = `
-          <div style="text-align: center;">
-            <h3>Reward Collected!</h3>
-            <p>You earned <strong>${lastTrial.points_awarded} points</strong> this trial.</p>
-          </div>
-        `;
-      }
+        if (lastTrial.choice === 'reveal') {
+          const range = lastTrial.assigned_range;
+          feedback = `
+            <div style="text-align: center;">
+              <h3>New Fractal Unlocked!</h3>
+              <p>This fractal will give you <strong>${range[0]} to ${range[1]} points</strong> in future trials.</p>
+              <p>You gained <strong>0 points</strong> this trial.</p>
+            </div>
+          `;
+        } else {
+          feedback = `
+            <div style="text-align: center;">
+              <h3>Reward Collected!</h3>
+              <p>You earned <strong>${lastTrial.points_awarded} points</strong> this trial.</p>
+            </div>
+          `;
+        }
 
-      return feedback;
-    },
-    choices: "NO_KEYS",          //  prevent keypresses
-    trial_duration: 1500         // fixed duration in ms
-  });
-
+        return feedback;
+      },
+      choices: "NO_KEYS",
+      trial_duration: 1500
+    });
   }
+
   // Arena instructions
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
@@ -405,7 +406,6 @@
   });
 
   // Arena trial
-  // Shuffle once and reuse
   let arena_stimuli = jsPsych.randomization.shuffle(all_stimuli);
 
   timeline.push({
@@ -477,54 +477,53 @@
         });
       });
 
-     document.getElementById("submit-selection").addEventListener("click", () => {
-      // Disable interaction after submission
-      document.querySelectorAll(".arena-fractal").forEach(item => item.style.pointerEvents = "none");
-      document.getElementById("submit-selection").disabled = true;
+      document.getElementById("submit-selection").addEventListener("click", () => {
+        // Disable interaction after submission
+        document.querySelectorAll(".arena-fractal").forEach(item => item.style.pointerEvents = "none");
+        document.getElementById("submit-selection").disabled = true;
 
-      const selected_ids = [];
-      const selected_ranges = [];
-      const selected_was_known = [];
-      const awarded_points = [];
+        const selected_ids = [];
+        const selected_ranges = [];
+        const selected_was_known = [];
+        const awarded_points = [];
 
-      selectedItems.forEach(({ stim }) => {
-        // Safety check: assign reward if missing or invalid
-        if (
-          !stim.reward_range ||
-          stim.reward_range.length !== 2 ||
-          typeof stim.reward_range[0] !== "number"
-        ) {
-          stim.reward_range = assignRewardRange();
-        }
+        selectedItems.forEach(({ stim }) => {
+          // Safety check: assign reward if missing or invalid
+          if (
+            !stim.reward_range ||
+            stim.reward_range.length !== 2 ||
+            typeof stim.reward_range[0] !== "number"
+          ) {
+            stim.reward_range = assignRewardRange();
+          }
 
-        // Draw points within range
-        const [min, max] = stim.reward_range;
-        const points = Math.floor(Math.random() * (max - min + 1)) + min;
+          // Draw points within range
+          const [min, max] = stim.reward_range;
+          const points = Math.floor(Math.random() * (max - min + 1)) + min;
 
-        //  Save everything for data
-        selected_ids.push(stim.id);
-        selected_ranges.push(stim.reward_range);
-        selected_was_known.push(stim.unlocked);
-        awarded_points.push(points);
+          // Save everything for data
+          selected_ids.push(stim.id);
+          selected_ranges.push(stim.reward_range);
+          selected_was_known.push(stim.unlocked);
+          awarded_points.push(points);
 
-        //  Mark as unlocked for future use
-        stim.unlocked = true;
+          // Mark as unlocked for future use
+          stim.unlocked = true;
+        });
+
+        const totalPoints = awarded_points.reduce((a, b) => a + b, 0);
+
+        // Finish the Arena trial with all info
+        jsPsych.finishTrial({
+          trial_type: 'arena',
+          selected_stimuli: selected_ids,
+          selected_was_known: selected_was_known,
+          selected_ranges: selected_ranges,
+          awarded_points: awarded_points,
+          total_points: totalPoints
+        });
       });
-
-      const totalPoints = awarded_points.reduce((a, b) => a + b, 0);
-
-      // Finish the Arena trial with all info
-      jsPsych.finishTrial({
-        trial_type: 'arena',
-        selected_stimuli: selected_ids,
-        selected_was_known: selected_was_known,
-        selected_ranges: selected_ranges,
-        awarded_points: awarded_points,
-        total_points: totalPoints
-      });
-    });
     }
-
   });
 
   // Final results
