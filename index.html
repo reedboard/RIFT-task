@@ -395,19 +395,19 @@
   });
 
   // Arena trial
+  // Shuffle once and reuse
+  let arena_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
+
   timeline.push({
     type: jsPsychHtmlKeyboardResponse,
     stimulus: function() {
-      // Assign reward ranges to unknown stimuli that haven't been unlocked yet
-      all_stimuli.forEach(stim => {
+      // Assign reward ranges to all unknowns before rendering
+      arena_stimuli.forEach(stim => {
         if (!stim.unlocked && !stim.reward_range) {
           stim.reward_range = assignRewardRange();
         }
       });
 
-      // Shuffle all stimuli for random display in grid
-      const shuffled_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
-      
       let html = `
         <h2 style="text-align: center;">Arena - Select 3 Fractals</h2>
         <div id="selection-counter" style="text-align: center; margin: 10px 0;">
@@ -415,14 +415,12 @@
         </div>
         <div class="arena-grid" id="arena">
       `;
-      
-      // Add all stimuli in 6x7 grid
-      shuffled_stimuli.forEach((stim, index) => {
-        const isKnown = stim.unlocked;
-        const statusClass = isKnown ? 'known' : 'unknown';
-        const statusText = isKnown ? 'KNOWN' : 'UNKNOWN';
-        const pointsText = isKnown ? `${stim.reward_range[0]}–${stim.reward_range[1]} pts` : '???';
-        
+
+      arena_stimuli.forEach((stim, index) => {
+        const statusClass = stim.unlocked ? 'known' : 'unknown';
+        const statusText = stim.unlocked ? 'KNOWN' : 'UNKNOWN';
+        const pointsText = stim.unlocked ? `${stim.reward_range[0]}–${stim.reward_range[1]} pts` : '???';
+
         html += `
           <div class="arena-fractal ${statusClass}" data-index="${index}">
             ${createFractalHTML(stim, 80)}
@@ -431,72 +429,81 @@
           </div>
         `;
       });
-      
-      html += `</div>`;
-      html += `
+
+      html += `</div>
         <div id="arena-submit" style="text-align: center; margin-top: 20px; display: none;">
           <button id="submit-selection" style="padding: 10px 20px; font-size: 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Submit Selection</button>
         </div>
       `;
-      
+
       return html;
     },
     choices: "NO_KEYS",
     on_load: function() {
       let selectedItems = [];
-      const shuffled_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
-      
-      document.querySelectorAll(".arena-fractal").forEach((item, itemIndex) => {
+
+      document.querySelectorAll(".arena-fractal").forEach((item) => {
+        const index = parseInt(item.dataset.index);
+        const stim = arena_stimuli[index];
+
         item.addEventListener("click", () => {
-          const index = parseInt(item.dataset.index);
-          const stimulus = shuffled_stimuli[index];
-          const itemId = `stimulus_${index}`;
-          
-          if (selectedItems.find(si => si.id === itemId)) {
+          if (document.getElementById("submit-selection").disabled) return;
+
+          const alreadySelected = selectedItems.find(si => si.index === index);
+
+          if (alreadySelected) {
             // Deselect
-            selectedItems = selectedItems.filter(si => si.id !== itemId);
+            selectedItems = selectedItems.filter(si => si.index !== index);
             item.classList.remove('selected');
           } else if (selectedItems.length < 3) {
-            // Select
-            if (!stimulus.unlocked) 
-            
-            
-            selectedItems.push({
-              id: itemId,
-              stimulus: stimulus
-            });
-            
+            // Just select, DO NOT REVEAL
+            selectedItems.push({ index: index, stim: stim });
             item.classList.add('selected');
           }
-          
-          // Update counter
+
+          // Update display
           document.getElementById("count").textContent = selectedItems.length;
-          
-          // Show/hide submit button
-          document.getElementById("arena-submit").style.display =
-            selectedItems.length === 3 ? "block" : "none";
+          document.getElementById("arena-submit").style.display = selectedItems.length === 3 ? "block" : "none";
         });
       });
-      
+
       document.getElementById("submit-selection").addEventListener("click", () => {
-        // Calculate points for each selection
-        const points = selectedItems.map(item => {
-          const [min, max] = item.stimulus.reward_range;
-          return Math.floor(Math.random() * (max - min + 1)) + min;
+        document.querySelectorAll(".arena-fractal").forEach(item => item.style.pointerEvents = "none");
+        document.getElementById("submit-selection").disabled = true;
+
+        const awardedPoints = [];
+        const selected_was_known = [];
+        const selected_ranges = [];
+        const selected_ids = [];
+
+        selectedItems.forEach(({ stim, index }) => {
+          if (!stim.unlocked) {
+            stim.reward_range = assignRewardRange();
+            stim.unlocked = true;
+          }
+
+          const [min, max] = stim.reward_range;
+          const points = Math.floor(Math.random() * (max - min + 1)) + min;
+
+          awardedPoints.push(points);
+          selected_was_known.push(stim.available_for_learning); // or `stim.unlocked` if you prefer
+          selected_ranges.push(stim.reward_range);
+          selected_ids.push(stim.id);
         });
-        
-        const totalPoints = points.reduce((a, b) => a + b, 0);
-        
+
+        const totalPoints = awardedPoints.reduce((a, b) => a + b, 0);
+
         jsPsych.finishTrial({
           trial_type: 'arena',
-          selected_stimuli: selectedItems.map(item => item.stimulus.id),
-          selected_was_known: selectedItems.map(item => item.stimulus.unlocked),
-          selected_ranges: selectedItems.map(item => item.stimulus.reward_range),
-          awarded_points: points,
+          selected_stimuli: selected_ids,
+          selected_was_known: selected_was_known,
+          selected_ranges: selected_ranges,
+          awarded_points: awardedPoints,
           total_points: totalPoints
         });
       });
     }
+
   });
 
   // Final results
