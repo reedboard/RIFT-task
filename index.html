@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SHAT Task</title>
+  <title>RIFT Task</title>
   <script src="https://unpkg.com/jspsych@8.2.2"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
@@ -133,7 +133,7 @@
 
   // Function to create fractal HTML
   function createFractalHTML(stimulus, width = 150) {
-    return `<img src="${stimulus.image}" width="${width}" height="${width}" style="border-radius: 10px;">`;
+    return `<img src="${stimulus.image}" width="${width}" height="${width}">`;
   }
 
   // Function to assign reward range
@@ -158,7 +158,7 @@
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
       <div style="max-width: 500px; margin: 0 auto; text-align: center;">
-        <h2>SHAT Task</h2>
+        <h2>RIFT Task</h2>
         <p>Choose between known and unknown reward options. Known options show point ranges, unknown options show "???" but reveal their value when selected.</p>
         <p><strong>Press F for LEFT, J for RIGHT</strong></p>
         <p>After 21 trials, you'll enter <strong>the Arena.<strong></p>
@@ -349,7 +349,7 @@
         const range = lastTrial.assigned_range;
         feedback = `
           <div style="text-align: center;">
-            <h3>New Stimulus Unlocked!</h3>
+            <h3>New Fractal Unlocked!</h3>
             <p>This fractal will give you <strong>${range[0]} to ${range[1]} points</strong> in future trials.</p>
             <p>You gained <strong>0 points</strong> this trial.</p>
           </div>
