@@ -63,6 +63,8 @@
     .arena-fractal.unknown {
       border-color: #FF9800;
     }
+    
+
   </style>
 </head>
 <body></body>
@@ -75,6 +77,7 @@
   });
 
   let timeline = [];
+  let current_points = 0; // Initialize points counter
 
   // Define reward ranges (ensuring no overlap for clear learning)
   const rewardRanges = [
@@ -128,12 +131,18 @@
   // Preload images
   timeline.push({
     type: jsPsychPreload,
-    images: all_stimuli.map(s => s.image)
+    images: all_stimuli.map(s => s.image),
+    on_error: function(file) {
+      console.error(`Failed to load image: ${file}`);
+    },
+    on_success: function(file) {
+      console.log(`Successfully loaded: ${file}`);
+    }
   });
 
   // Function to create fractal HTML
   function createFractalHTML(stimulus, width = 150) {
-    return `<img src="${stimulus.image}" width="${width}" height="${width}">`;
+    return `<img src="${stimulus.image}" width="${width}" height="${width}" onerror="console.error('Image failed to load: ${stimulus.image}'); this.style.background='#ff6b6b'; this.alt='Fractal ${stimulus.id}';">`;
   }
 
   // Function to assign reward range
@@ -168,93 +177,101 @@
     choices: "ALL_KEYS"
   });
 
-  // First trial: force learning by presenting two unknowns from learning pool
-if (learning_stimuli.length >= 1 && known_stimuli.length >= 1) {
-  const unknown = learning_stimuli.shift(); // remove one from the learning pool
-  const known = known_stimuli[0]; // use first available known fractal
+  // Create some initial known stimuli by pre-unlocking a few
+  const initial_known_count = 3;
+  for (let i = 0; i < initial_known_count; i++) {
+    const stimulus = learning_stimuli[i];
+    stimulus.unlocked = true;
+    stimulus.reward_range = assignRewardRange();
+    unlocked_stimuli.push(stimulus);
+  }
+  
+  // Remove the pre-unlocked stimuli from learning pool
+  learning_stimuli.splice(0, initial_known_count);
 
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-      <div class="countdown-display">Trials to Arena: 21</div>
-      <div class="stimulus-container">
-        <div class="stimulus-option">
-          ${createFractalHTML(known)}
-          <p style="font-size: 16px; font-weight: bold; color: green;">
-            ${known.reward_range[0]}–${known.reward_range[1]} Points
-          </p>
-          <p><strong>F: ACCEPT</strong></p>
-        </div>
-        <div class="stimulus-option">
-          ${createFractalHTML(unknown)}
-          <p style="font-size: 18px; font-weight: bold; color: yellow;">???</p>
-          <p><strong>J: REVEAL</strong></p>
-        </div>
-      </div>
-      <div class="points-tally">Total Points: ${current_points}</div>
-    `,
-    choices: ['f', 'j'],
-    data: {
-      trial_type: 'forced_learning',
-      trial_number: 0,
-      left_stimulus: known.id,
-      right_stimulus: unknown.id
-    },
-    on_finish: function(data) {
-      if (data.response === 'f') {
-        data.choice_type = 'accept';
-        data.chosen_stimulus = known.id;
-        data.reward = jsPsych.randomization.sampleWithoutReplacement(
-          jsPsych.utils.range(known.reward_range[0], known.reward_range[1] + 1), 1
-        )[0];
-        current_points += data.reward;
-      } else {
-        data.choice_type = 'reveal';
-        data.chosen_stimulus = unknown.id;
+  // First trial: force learning by presenting one known and one unknown
+  if (learning_stimuli.length >= 1 && unlocked_stimuli.length >= 1) {
+    const unknown = learning_stimuli.shift(); // remove one from the learning pool
+    const known = unlocked_stimuli[0]; // use first available known fractal
 
-        // Assign a reward range dynamically if needed
-        const new_range = jsPsych.randomization.sampleWithoutReplacement([
-          [1, 5], [6, 10], [11, 15], [16, 20], [21, 25]
-        ], 1)[0];
-
-        unknown.unlocked = true;
-        unknown.reward_range = new_range;
-        unlocked_stimuli.push(unknown);
-
-        data.assigned_range = new_range;
-      }
-    }
-  });
-
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: function() {
-      const last = jsPsych.data.get().last(1).values()[0];
-      if (last.choice_type === 'accept') {
-        return `
-          <div style="text-align: center;">
-            <h3>You earned <span style="color: green;"><strong>${last.reward}</strong></span> points!</h3>
-          </div>
-        `;
-      } else {
-        const range = last.assigned_range;
-        return `
-          <div style="text-align: center;">
-            <h3>Stimulus Unlocked!</h3>
-            <p>This fractal will give you 
-              <span style="color: yellow;"><strong>${range[0]}–${range[1]}</strong></span> 
-              points in future trials.
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <div class="countdown-display">Trials to Arena: 21</div>
+        <div class="stimulus-container">
+          <div class="stimulus-option">
+            ${createFractalHTML(known)}
+            <p style="font-size: 16px; font-weight: bold; color: green;">
+              ${known.reward_range[0]}–${known.reward_range[1]} Points
             </p>
+            <p><strong>F: ACCEPT</strong></p>
           </div>
-        `;
+          <div class="stimulus-option">
+            ${createFractalHTML(unknown)}
+            <p style="font-size: 18px; font-weight: bold; color: orange;">???</p>
+            <p><strong>J: REVEAL</strong></p>
+          </div>
+        </div>
+        <div style="text-align: center; margin-top: 20px;">Total Points: ${current_points}</div>
+      `,
+      choices: ['f', 'j'],
+      data: {
+        trial_type: 'forced_learning',
+        trial_number: 0,
+        left_stimulus: known.id,
+        right_stimulus: unknown.id
+      },
+      on_finish: function(data) {
+        if (data.response === 'f') {
+          data.choice_type = 'accept';
+          data.chosen_stimulus = known.id;
+          data.reward = jsPsych.randomization.sampleWithoutReplacement(
+            jsPsych.utils.range(known.reward_range[0], known.reward_range[1] + 1), 1
+          )[0];
+          current_points += data.reward;
+        } else {
+          data.choice_type = 'reveal';
+          data.chosen_stimulus = unknown.id;
+
+          // Assign a reward range
+          const new_range = assignRewardRange();
+
+          unknown.unlocked = true;
+          unknown.reward_range = new_range;
+          unlocked_stimuli.push(unknown);
+
+          data.assigned_range = new_range;
+        }
       }
-    },
-    choices: "NO_KEYS",
-    trial_duration: 2500
-  });
-}
+    });
 
-
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        const last = jsPsych.data.get().last(1).values()[0];
+        if (last.choice_type === 'accept') {
+          return `
+            <div style="text-align: center;">
+              <h3>You earned <span style="color: green;"><strong>${last.reward}</strong></span> points!</h3>
+            </div>
+          `;
+        } else {
+          const range = last.assigned_range;
+          return `
+            <div style="text-align: center;">
+              <h3>Stimulus Unlocked!</h3>
+              <p>This fractal will give you 
+                <span style="color: orange;"><strong>${range[0]}–${range[1]}</strong></span> 
+                points in future trials.
+              </p>
+            </div>
+          `;
+        }
+      },
+      choices: "NO_KEYS",
+      trial_duration: 2500
+    });
+  }
 
   // Main choice trials (20 more trials, for 21 total)
   for (let i = 1; i <= 20; i++) {
@@ -351,6 +368,7 @@ if (learning_stimuli.length >= 1 && known_stimuli.length >= 1) {
           data.chosen_stimulus = known.id;
           data.revealed = false;
           data.points_awarded = points;
+          current_points += points;
           
           console.log(`Trial ${i}: Accepted ${known.id}, awarded ${points} points`);
         } else {
@@ -539,10 +557,6 @@ if (learning_stimuli.length >= 1 && known_stimuli.length >= 1) {
     type: jsPsychHtmlButtonResponse,
     stimulus: function() {
       const arena_data = jsPsych.data.get().last(1).values()[0];
-      const allData = jsPsych.data.get().values();
-      const totalPointsEarned = allData
-        .filter(trial => trial.points_awarded)
-        .reduce((sum, trial) => sum + trial.points_awarded, 0);
       
       const knownSelected = arena_data.selected_was_known.filter(k => k === true).length;
       const unknownSelected = arena_data.selected_was_known.filter(k => k === false).length;
@@ -556,8 +570,8 @@ if (learning_stimuli.length >= 1 && known_stimuli.length >= 1) {
           <p>Individual selections: ${arena_data.awarded_points.join(', ')} points</p>
           <h3>Total Experiment Points:</h3>
           <p>Arena: <strong>${arena_data.total_points}</strong> points</p>
-          <p>Learning phase: <strong>${totalPointsEarned}</strong> points</p>
-          <p><strong>Grand Total: ${totalPointsEarned + arena_data.total_points} points</strong></p>
+          <p>Learning phase: <strong>${current_points}</strong> points</p>
+          <p><strong>Grand Total: ${current_points + arena_data.total_points} points</strong></p>
           <br>
           <p>Thank you for participating!</p>
         </div>
