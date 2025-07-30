@@ -302,28 +302,21 @@
   });
 
   // Arena instructions
-  timeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: function() {
-      const known_count = unlocked_stimuli.length;
-      const unknown_count = 42 - known_count;
-      
-      return `
-        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
-          <h2>Welcome to the Arena!</h2>
-          <p>Now you can choose from all 42 fractals arranged in a 6x7 grid.</p>
-          <p><strong>Available options:</strong></p>
-          <p>• ${known_count} Known fractals (showing point ranges)</p>
-          <p>• ${unknown_count} Unknown fractals (showing "???")</p>
-          <p><strong>Select exactly 3 fractals</strong> to maximize your points.</p>
-          <p>Click on fractals to select them (they'll turn blue when selected).</p>
-          <p>Unknown fractals will reveal their point ranges when selected!</p>
-          <p><em>Press any key to enter the Arena</em></p>
-        </div>
-      `;
-    },
-    choices: "ALL_KEYS"
-  });
+timeline.push({
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: function() {
+    return `
+      <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+        <h2>Welcome to the Arena!</h2>
+        <p>Now you can choose from all 42 fractals arranged in a 6x7 grid.</p>
+        <p><strong>Select exactly 3 fractals</strong> to maximize your points.</p>
+        <p>Click on fractals to select them (they'll turn blue when selected).</p>
+        <p><em>Press any key to enter the Arena</em></p>
+      </div>
+    `;
+  },
+  choices: "ALL_KEYS"
+});
 
 // Arena trial (fixed - no reward values shown during selection)
 timeline.push({
@@ -335,7 +328,9 @@ timeline.push({
         stim.reward_range = assignRewardRange();
       }
     });
-    const shuffled_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
+    
+    // Store the shuffled array globally so both functions use the same order
+    window.shuffled_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
     
     let html = `
       <h2 style="text-align: center;">Arena - Select 3 Fractals</h2>
@@ -345,7 +340,7 @@ timeline.push({
       <div class="arena-grid" id="arena">
     `;
     
-    shuffled_stimuli.forEach((stim, index) => {
+    window.shuffled_stimuli.forEach((stim, index) => {
       const isKnown = stim.unlocked;
       const statusClass = isKnown ? 'known' : 'unknown';
       const statusText = isKnown ? 'KNOWN' : 'UNKNOWN';
@@ -371,7 +366,8 @@ timeline.push({
   choices: "NO_KEYS",
   on_load: function() {
     let selectedItems = [];
-    const shuffled_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
+    // Use the same shuffled array from the stimulus function
+    const shuffled_stimuli = window.shuffled_stimuli;
     
     document.querySelectorAll(".arena-fractal").forEach((item, itemIndex) => {
       item.addEventListener("click", () => {
@@ -409,7 +405,7 @@ timeline.push({
       
       const totalPoints = points.reduce((a, b) => a + b, 0);
       
-      // End trial with results - rewards are revealed in the results screen, not during selection
+      // End trial with results
       jsPsych.finishTrial({
         trial_type: 'arena',
         selected_stimuli: selectedItems.map(item => item.stimulus.id),
@@ -423,31 +419,28 @@ timeline.push({
 });
 
   // Final results
-  timeline.push({
-    type: jsPsychHtmlButtonResponse,
-    stimulus: function() {
-      const arena_data = jsPsych.data.get().last(1).values()[0];
-      const knownSelected = arena_data.selected_was_known.filter(k => k === true).length;
-      const unknownSelected = arena_data.selected_was_known.filter(k => k === false).length;
-      
-      return `
-        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
-          <h2>Experiment Complete!</h2>
-          <h3>Arena Results:</h3>
-          <p>You selected ${knownSelected} known and ${unknownSelected} unknown fractals</p>
-          <p>You earned <strong>${arena_data.total_points}</strong> points in the Arena!</p>
-          <p>Individual selections: ${arena_data.awarded_points.join(', ')} points</p>
-          <h3>Total Experiment Points:</h3>
-          <p>Arena: <strong>${arena_data.total_points}</strong> points</p>
-          <p>Learning phase: <strong>${current_points}</strong> points</p>
-          <p><strong>Grand Total: ${current_points + arena_data.total_points} points</strong></p>
-          <br>
-          <p>Thank you for participating!</p>
-        </div>
-      `;
-    },
-    choices: ['View Data', 'Finish']
-  });
+timeline.push({
+  type: jsPsychHtmlButtonResponse,
+  stimulus: function() {
+    const arena_data = jsPsych.data.get().last(1).values()[0];
+    
+    return `
+      <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+        <h2>Experiment Complete!</h2>
+        <h3>Arena Results:</h3>
+        <p>You earned <strong>${arena_data.total_points}</strong> points in the Arena!</p>
+        <p>Individual selections: ${arena_data.awarded_points.join(', ')} points</p>
+        <h3>Total Experiment Points:</h3>
+        <p>Arena: <strong>${arena_data.total_points}</strong> points</p>
+        <p>Learning phase: <strong>${current_points}</strong> points</p>
+        <p><strong>Grand Total: ${current_points + arena_data.total_points} points</strong></p>
+        <br>
+        <p>Thank you for participating!</p>
+      </div>
+    `;
+  },
+  choices: ['View Data', 'Finish']
+});
 
   // Run the experiment
   jsPsych.run(timeline);
