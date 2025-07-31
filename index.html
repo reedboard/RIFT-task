@@ -8,6 +8,11 @@
   <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
   <link href="https://unpkg.com/jspsych@8.2.2/css/jspsych.css" rel="stylesheet" type="text/css" />
   <style>
+    body {
+      background-color: #2a2a2a;
+      color: #ffffff;
+    }
+    
     .arena-item:hover {
       cursor: pointer;
       opacity: 0.8;
@@ -17,26 +22,38 @@
       justify-content: space-around;
       align-items: center;
       margin: 20px 0;
-      gap: 100px;
+      gap: 150px;
+      min-height: 500px; /* Fixed height to prevent layout shifts */
     }
 
     .countdown-display {
       position: fixed;
       top: 50px;
       right: 70px;
-      background: #f0f0f0;
+      background: #000000;
+      color: #ffffff;
       padding: 10px 15px;
       border-radius: 8px;
       border: 2px solid #fa0101;
       font-weight: bold;
       font-size: 25px;
     }
+    .points-display {
+      position: fixed;
+      top: 50px;
+      left: 70px;
+      background: #0f060a;
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 2px solid #4CAF50;
+      font-weight: bold;
+      font-size: 25px;
+      color: #4CAF50;
+    }
     .arena-grid {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      grid-template-rows: repeat(6, 1fr);
-      gap: 15px;
-      max-width: 900px;
+      gap: 20px;
+      max-width: 750px;
       margin: 20px auto;
       padding: 20px;
     }
@@ -45,8 +62,6 @@
       flex-direction: column;
       align-items: center;
       padding: 8px;
-      border: 3px solid #ccc;
-      border-radius: 8px;
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -54,28 +69,84 @@
       opacity: 0.8;
     }
     .arena-fractal.selected {
+      border: 3px solid #2196F3;
+      border-radius: 8px;
+      background-color: #1c0e2d;
+    }
+    
+    .feedback-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 40px 0;
+      gap: 50px;
+    }
+    
+    .feedback-fractal {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      border: 4px solid #222;
+      border-radius: 12px;
+      background: #060606;
+    }
+    
+    .feedback-fractal.chosen {
       border-color: #2196F3;
-      background-color: #e3f2fd;
+      background: #1c0e2d;
+      box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
     }
-    .arena-fractal.known {
-      border-color: #4CAF50;
+    
+    .points-accepted {
+      color: #4CAF50;
+      font-size: 24px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.1);
     }
-    .arena-fractal.unknown {
-      border-color: #FF9800;
+    
+    .points-revealed {
+      color: #FF9800;
+      font-size: 24px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(255,255,255,0.1);
+    }
+
+    .stimulus-option {
+      text-align: center;
+    }
+
+    .stimulus-option.chosen-accept .points-text {
+      color: #4CAF50 !important;
+    }
+
+    .stimulus-option.chosen-accept .action-text {
+      color: #4CAF50 !important;
+    }
+
+    .stimulus-option.chosen-reveal .points-text {
+      color: #FF9800 !important;
+    }
+
+    .stimulus-option.chosen-reveal .action-text {
+      color: #FF9800 !important;
     }
   </style>
 </head>
 <body></body>
 <script>
+  // Initialize global variables FIRST
+  let timeline = [];
+  let current_points = 0;
+  let total_reveals = 0;
+  let total_trials = 30;
+  
   const jsPsych = initJsPsych({
     on_finish: () => {
       console.log("Experiment completed");
       jsPsych.data.displayData();
     }
   });
-
-  let timeline = [];
-  let current_points = 0;
 
   // Define reward ranges
   const rewardRanges = [
@@ -86,33 +157,40 @@
     [100, 150], [150, 200], [200, 250], [250, 300]
   ];
 
-  // Fractal image filenames
+  // Updated fractal image filenames - using all provided filenames
   const fractalFilenames = [
-    'SHINEd_fractal_001.png', 'SHINEd_fractal_002.png', 'SHINEd_fractal_004.png',
-    'SHINEd_fractal_005.png', 'SHINEd_fractal_006.png', 'SHINEd_fractal_013.png',
-    'SHINEd_fractal_016.png', 'SHINEd_fractal_021.png', 'SHINEd_fractal_022.png',
-    'SHINEd_fractal_034.png', 'SHINEd_fractal_047.png', 'SHINEd_fractal_049.png',
-    'SHINEd_fractal_056.png', 'SHINEd_fractal_076.png', 'SHINEd_fractal_078.png',
-    'SHINEd_fractal_087.png', 'SHINEd_fractal_1005.png', 'SHINEd_fractal_1007.png',
-    'SHINEd_fractal_101.png', 'SHINEd_fractal_1013.png', 'SHINEd_fractal_1017.png',
-    'SHINEd_fractal_1018.png', 'SHINEd_fractal_1019.png', 'SHINEd_fractal_1020.png',
-    'SHINEd_fractal_1021.png', 'SHINEd_fractal_1022.png', 'SHINEd_fractal_1029.png',
-    'SHINEd_fractal_103.png', 'SHINEd_fractal_1046.png', 'SHINEd_fractal_1048.png',
-    'SHINEd_fractal_105.png', 'SHINEd_fractal_1058.png', 'SHINEd_fractal_106.png',
-    'SHINEd_fractal_1061.png', 'SHINEd_fractal_1062.png', 'SHINEd_fractal_1077.png',
-    'SHINEd_fractal_1079.png', 'SHINEd_fractal_1080.png', 'SHINEd_fractal_1087.png',
-    'SHINEd_fractal_1090.png', 'SHINEd_fractal_1094.png', 'SHINEd_fractal_1103.png',
-    'SHINEd_fractal_1108.png'
+    '10.bmp', '11.bmp', '12.bmp', '13.bmp', '14.bmp', '15.bmp', '16.bmp', '17.bmp', '18.bmp', '20.bmp', 
+    '31.bmp', '42.bmp', '52.bmp', '62.bmp', '72.bmp', '82.bmp', '92.bmp', '100.bmp', '110.bmp', '120.bmp', 
+    '130.bmp', '140.bmp', '150.bmp', '160.bmp', '170.bmp', '180.bmp', '21.bmp', '32.bmp', '43.bmp', '53.bmp', 
+    '63.bmp', '73.bmp', '83.bmp', '93.bmp', '101.bmp', '111.bmp', '121.bmp', '131.bmp', '141.bmp', '151.bmp', 
+    '161.bmp', '171.bmp', '181.bmp', '22.bmp', '33.bmp', '44.bmp', '54.bmp', '64.bmp', '74.bmp', '84.bmp', 
+    '94.bmp', '102.bmp', '112.bmp', '122.bmp', '132.bmp', '142.bmp', '152.bmp', '162.bmp', '172.bmp', '182.bmp', 
+    '23.bmp', '34.bmp', '45.bmp', '55.bmp', '65.bmp', '75.bmp', '85.bmp', '95.bmp', '103.bmp', '113.bmp', 
+    '123.bmp', '133.bmp', '143.bmp', '153.bmp', '163.bmp', '173.bmp', '183.bmp', '24.bmp', '35.bmp', '46.bmp', 
+    '56.bmp', '66.bmp', '76.bmp', '86.bmp', '96.bmp', '104.bmp', '114.bmp', '124.bmp', '134.bmp', '144.bmp', 
+    '154.bmp', '164.bmp', '174.bmp', '184.bmp', '25.bmp', '36.bmp', '47.bmp', '57.bmp', '67.bmp', '77.bmp', 
+    '87.bmp', '97.bmp', '105.bmp', '115.bmp', '125.bmp', '135.bmp', '145.bmp', '155.bmp', '165.bmp', '175.bmp', 
+    '185.bmp', '26.bmp', '37.bmp', '48.bmp', '58.bmp', '68.bmp', '78.bmp', '88.bmp', '98.bmp', '106.bmp', 
+    '116.bmp', '126.bmp', '136.bmp', '146.bmp', '156.bmp', '166.bmp', '176.bmp', '186.bmp', '27.bmp', '38.bmp', 
+    '49.bmp', '59.bmp', '69.bmp', '79.bmp', '89.bmp', '99.bmp', '107.bmp', '117.bmp', '127.bmp', '137.bmp', 
+    '147.bmp', '157.bmp', '167.bmp', '177.bmp', '187.bmp', '28.bmp', '39.bmp', '5.bmp', '6.bmp', '7.bmp', 
+    '8.bmp', '9.bmp', '108.bmp', '118.bmp', '128.bmp', '138.bmp', '148.bmp', '158.bmp', '168.bmp', '178.bmp', 
+    '188.bmp', '29.bmp', '40.bmp', '50.bmp', '60.bmp', '70.bmp', '80.bmp', '90.bmp', '109.bmp', '119.bmp', 
+    '129.bmp', '139.bmp', '149.bmp', '159.bmp', '169.bmp', '179.bmp', '19.bmp', '30.bmp', '41.bmp', '51.bmp', 
+    '61.bmp', '71.bmp', '81.bmp', '91.bmp'
   ];
 
-  // Create stimulus pool
+  // Create stimulus pool - use ALL 
   let all_stimuli = fractalFilenames.map((filename, index) => ({
     id: `fractal_${index + 1}`,
-    image: `stimuli_400_fractals/${filename}`,
+    image: `Stim/${filename}`,
     unlocked: false,
     reward_range: null,
-    available_for_learning: index < 21
+    available_for_learning: true  // All can be used in learning
   }));
+  
+  let arena_stimuli = [];
+  let unlocked_stimuli = [];
 
   // Preload images
   timeline.push({
@@ -124,7 +202,7 @@
   });
 
   // Function to create fractal HTML
-  function createFractalHTML(stimulus, width = 150) {
+  function createFractalHTML(stimulus, width = 400) {
     return `<img src="${stimulus.image}" width="${width}" height="${width}" alt="${stimulus.id}">`;
   }
 
@@ -141,72 +219,59 @@
         <h2>RIFT Task</h2>
         <p>Choose between known and unknown reward options. Known options show point ranges, unknown options show "???" but reveal their value when selected.</p>
         <p><strong>Press F for LEFT, J for RIGHT</strong></p>
-        <p>After 21 trials, you'll enter <strong>the Arena.</strong></p>
+        <p>After 30 trials, you'll enter <strong>the Arena.</strong></p>
         <p><strong>Press any key to begin</strong></p>
       </div>
     `,
     choices: "ALL_KEYS"
   });
 
-  // Initialize some known stimuli
-  let learning_stimuli = all_stimuli.filter(s => s.available_for_learning);
-  let unlocked_stimuli = [];
+  // Initialize learning stimuli
+  let learning_stimuli = [...all_stimuli];
   
-  // Pre-unlock first stimuli as known
-  for (let i = 0; i < 1; i++) {
-    learning_stimuli[i].unlocked = true;
-    learning_stimuli[i].reward_range = assignRewardRange();
-    unlocked_stimuli.push(learning_stimuli[i]);
-  }
+  // Pre-unlock first stimulus as known (ONLY 1!)
+  learning_stimuli[0].unlocked = true;
+  learning_stimuli[0].reward_range = assignRewardRange();
+  unlocked_stimuli.push(learning_stimuli[0]);
 
-  // Create all 21 choice trials as static trials instead of dynamic generation
-  const choice_trials = [];
-  
-  for (let trial_num = 0; trial_num < 21; trial_num++) {
-    // Pre-determine the stimuli for this trial
-    const available_known = unlocked_stimuli.filter(s => s.available_for_learning);
-    const available_unknown = learning_stimuli.filter(s => !s.unlocked && s.available_for_learning);
-    
-    if (available_known.length === 0 || available_unknown.length === 0) {
-      console.log(`Trial ${trial_num}: Not enough stimuli available`);
-      break;
-    }
-    
-    const known_stim = available_known[Math.floor(Math.random() * available_known.length)];
-    const unknown_stim = available_unknown[Math.floor(Math.random() * available_unknown.length)];
-    const known_on_left = Math.random() < 0.5;
-    
-    choice_trials.push({
-      trial_number: trial_num + 1,
-      known_stimulus: known_stim,
-      unknown_stimulus: unknown_stim,
-      known_on_left: known_on_left
-    });
-  }
-
-  // Add the actual trial objects to timeline
-  choice_trials.forEach((trial_info, index) => {
+  // Create 30 choice trials
+  for (let trial_num = 1; trial_num <= 30; trial_num++) {
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
       stimulus: function() {
-        const trialsLeft = 21 - trial_info.trial_number;
-        const known = trial_info.known_stimulus;
-        const unknown = trial_info.unknown_stimulus;
-        const known_on_left = trial_info.known_on_left;
+        const available_known = unlocked_stimuli;
+        const available_unknown = learning_stimuli.filter(s => !s.unlocked);
+        
+        if (available_known.length === 0 || available_unknown.length === 0) {
+          return `<p style="color: #ffffff;">Error: Not enough stimuli available</p>`;
+        }
+        
+        const known_stim = available_known[Math.floor(Math.random() * available_known.length)];
+        const unknown_stim = available_unknown[Math.floor(Math.random() * available_unknown.length)];
+        const known_on_left = Math.random() < 0.5;
+        
+        // Store trial info for access in on_finish
+        jsPsych.data.addProperties({
+          current_known: known_stim,
+          current_unknown: unknown_stim,
+          current_known_on_left: known_on_left
+        });
+        
+        const trialsLeft = 30 - trial_num + 1;
         
         const knownHTML = `
-          <div class="stimulus-option">
-            ${createFractalHTML(known)}
-            <p style="font-size: 16px; font-weight: bold;">${known.reward_range[0]}–${known.reward_range[1]} Points</p>
-            <p><strong>ACCEPT</strong></p>
+          <div class="stimulus-option" id="known-option">
+            ${createFractalHTML(known_stim)}
+            <p class="points-text" style="font-size: 16px; font-weight: bold;">${known_stim.reward_range[0]}–${known_stim.reward_range[1]} Points</p>
+            <p class="action-text"><strong>ACCEPT</strong></p>
           </div>
         `;
         
         const unknownHTML = `
-          <div class="stimulus-option">
-            ${createFractalHTML(unknown)}
-            <p style="font-size: 18px; font-weight: bold;">???</p>
-            <p><strong>REVEAL</strong></p>
+          <div class="stimulus-option" id="unknown-option">
+            ${createFractalHTML(unknown_stim)}
+            <p class="points-text" style="font-size: 18px; font-weight: bold;">???</p>
+            <p class="action-text"><strong>REVEAL</strong></p>
           </div>
         `;
 
@@ -215,28 +280,27 @@
 
         return `
           <div class="countdown-display">Trials to Arena: ${trialsLeft}</div>
+          <div class="points-display">Points: ${current_points}</div>
           <div class="stimulus-container">
             ${leftStim}
             ${rightStim}
           </div>
-          <p style="text-align: center; margin-top: 20px;"><strong>Press F for LEFT, J for RIGHT</strong></p>
-          <div style="text-align: center; margin-top: 10px;">Total Points: ${current_points}</div>
         `;
       },
       choices: ['f', 'j'],
       data: {
         trial_type: 'choice',
-        trial_number: trial_info.trial_number,
-        known_stimulus: trial_info.known_stimulus.id,
-        unknown_stimulus: trial_info.unknown_stimulus.id,
-        known_on_left: trial_info.known_on_left
+        trial_number: trial_num
       },
       on_finish: function(data) {
-        console.log(`Starting trial ${data.trial_number} processing`);
+        const trial_data = jsPsych.data.get().last(1).values()[0];
+        const known = trial_data.current_known;
+        const unknown = trial_data.current_unknown;
+        const known_on_left = trial_data.current_known_on_left;
         
-        const known = trial_info.known_stimulus;
-        const unknown = trial_info.unknown_stimulus;
-        const known_on_left = trial_info.known_on_left;
+        data.known_stimulus = known.id;
+        data.unknown_stimulus = unknown.id;
+        data.known_on_left = known_on_left;
         
         const chose_left = data.response === 'f';
         const chose_known = (chose_left && known_on_left) || (!chose_left && !known_on_left);
@@ -249,198 +313,308 @@
           data.chosen_stimulus = known.id;
           data.points_awarded = points;
           current_points += points;
-          
-          console.log(`Trial ${data.trial_number}: Accepted ${known.id}, awarded ${points} points`);
         } else {
           const assigned_range = assignRewardRange();
           unknown.unlocked = true;
           unknown.reward_range = assigned_range;
           unlocked_stimuli.push(unknown);
           
+          total_reveals++;
+          
           data.choice = 'reveal';
           data.chosen_stimulus = unknown.id;
           data.assigned_range = assigned_range;
           data.points_awarded = 0;
-          
-          console.log(`Trial ${data.trial_number}: Revealed ${unknown.id} with range [${assigned_range[0]}, ${assigned_range[1]}]`);
         }
-        
-        console.log(`Finished trial ${data.trial_number} processing`);
       }
     });
 
-    // Feedback after each trial
+    // Feedback trial showing the choice with highlighting - with minimum display time
     timeline.push({
       type: jsPsychHtmlKeyboardResponse,
       stimulus: function() {
         const lastTrial = jsPsych.data.get().last(1).values()[0];
-        let feedback = "";
-
-        if (lastTrial.choice === 'reveal') {
-          const range = lastTrial.assigned_range;
-          feedback = `
-            <div style="text-align: center;">
-              <h3>New Fractal Unlocked!</h3>
-              <p>This fractal will give you <strong>${range[0]} to ${range[1]} points</strong> in future trials.</p>
-              <p>You gained <strong>0 points</strong> this trial.</p>
+        const known = lastTrial.current_known;
+        const unknown = lastTrial.current_unknown;
+        const known_on_left = lastTrial.current_known_on_left;
+        const chose_known = lastTrial.choice === 'accept';
+        
+        // Store feedback info globally for the second trial
+        window.feedbackInfo = {
+          choice: lastTrial.choice,
+          assigned_range: lastTrial.assigned_range,
+          points_awarded: lastTrial.points_awarded,
+          known: known,
+          unknown: unknown, 
+          known_on_left: known_on_left,
+          chose_known: chose_known
+        };
+        
+        const trialsLeft = 30 - trial_num;
+        
+        let knownHTML, unknownHTML;
+        
+        if (chose_known) {
+          // Highlight the known option in green
+          knownHTML = `
+            <div class="stimulus-option chosen-accept">
+              ${createFractalHTML(known)}
+              <p class="points-text" style="font-size: 16px; font-weight: bold; color: #4CAF50;">${known.reward_range[0]}–${known.reward_range[1]} Points</p>
+              <p class="action-text" style="color: #4CAF50;"><strong>ACCEPT</strong></p>
+            </div>
+          `;
+          unknownHTML = `
+            <div class="stimulus-option">
+              ${createFractalHTML(unknown)}
+              <p class="points-text" style="font-size: 18px; font-weight: bold;">???</p>
+              <p class="action-text"><strong>REVEAL</strong></p>
             </div>
           `;
         } else {
-          feedback = `
-            <div style="text-align: center;">
-              <h3>Reward Collected!</h3>
-              <p>You earned <strong>${lastTrial.points_awarded} points</strong> this trial.</p>
+          // Show revealed value in yellow
+          const range = lastTrial.assigned_range;
+          knownHTML = `
+            <div class="stimulus-option">
+              ${createFractalHTML(known)}
+              <p class="points-text" style="font-size: 16px; font-weight: bold;">${known.reward_range[0]}–${known.reward_range[1]} Points</p>
+              <p class="action-text"><strong>ACCEPT</strong></p>
+            </div>
+          `;
+          unknownHTML = `
+            <div class="stimulus-option chosen-reveal">
+              ${createFractalHTML(unknown)}
+              <p class="points-text" style="font-size: 18px; font-weight: bold; color: #FF9800;">${range[0]}–${range[1]} Points</p>
+              <p class="action-text" style="color: #FF9800;"><strong>REVEAL</strong></p>
             </div>
           `;
         }
+        
+        const leftStim = known_on_left ? knownHTML : unknownHTML;
+        const rightStim = known_on_left ? unknownHTML : knownHTML;
 
-        return feedback;
+        return `
+          <div class="countdown-display">Trials to Arena: ${trialsLeft}</div>
+          <div class="points-display">Points: ${current_points}</div>
+          <div class="stimulus-container">
+            ${leftStim}
+            ${rightStim}
+          </div>
+        `;
       },
       choices: "NO_KEYS",
-      trial_duration: 1500
+      trial_duration: 500
     });
-  });
 
-  // Arena instructions
-timeline.push({
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: function() {
-    return `
-      <div style="text-align: center; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome to the Arena!</h2>
-        <p>Now you can choose from all 42 fractals arranged in a 6x7 grid.</p>
-        <p><strong>Select exactly 3 fractals</strong> to maximize your points.</p>
-        <p>Click on fractals to select them (they'll turn blue when selected).</p>
-        <p><em>Press any key to enter the Arena</em></p>
-      </div>
-    `;
-  },
-  choices: "ALL_KEYS"
-});
-
-// Arena trial (fixed - no reward values shown during selection)
-timeline.push({
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: function() {
-    // Assign ranges to all remaining unknown stimuli
-    all_stimuli.forEach(stim => {
-      if (!stim.unlocked && !stim.reward_range) {
-        stim.reward_range = assignRewardRange();
-      }
-    });
-    
-    // Store the shuffled array globally so both functions use the same order
-    window.shuffled_stimuli = jsPsych.randomization.shuffle([...all_stimuli]);
-    
-    let html = `
-      <h2 style="text-align: center;">Arena - Select 3 Fractals</h2>
-      <div id="selection-counter" style="text-align: center; margin: 10px 0;">
-        <p>Selected: <span id="count">0</span>/3</p>
-      </div>
-      <div class="arena-grid" id="arena">
-    `;
-    
-    window.shuffled_stimuli.forEach((stim, index) => {
-      const isKnown = stim.unlocked;
-      const statusClass = isKnown ? 'known' : 'unknown';
-      const statusText = isKnown ? 'KNOWN' : 'UNKNOWN';
-      // NO POINTS SHOWN - subjects must rely on memory
-      
-      html += `
-        <div class="arena-fractal ${statusClass}" data-index="${index}">
-          ${createFractalHTML(stim, 80)}
-          <p style="margin: 3px 0; font-size: 10px; font-weight: bold;">${statusText}</p>
-        </div>
-      `;
-    });
-    
-    html += `</div>`;
-    html += `
-      <div id="arena-submit" style="text-align: center; margin-top: 20px; display: none;">
-        <button id="submit-selection" style="padding: 10px 20px; font-size: 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Submit Selection</button>
-      </div>
-    `;
-    
-    return html;
-  },
-  choices: "NO_KEYS",
-  on_load: function() {
-    let selectedItems = [];
-    // Use the same shuffled array from the stimulus function
-    const shuffled_stimuli = window.shuffled_stimuli;
-    
-    document.querySelectorAll(".arena-fractal").forEach((item, itemIndex) => {
-      item.addEventListener("click", () => {
-        const index = parseInt(item.dataset.index);
-        const stimulus = shuffled_stimuli[index];
-        const itemId = `stimulus_${index}`;
+    // Second trial - now wait for keypress
+    timeline.push({
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        const feedbackInfo = window.feedbackInfo;
+        const trialsLeft = 30 - trial_num;
         
-        if (selectedItems.find(si => si.id === itemId)) {
-          // Deselect item
-          selectedItems = selectedItems.filter(si => si.id !== itemId);
-          item.classList.remove('selected');
-        } else if (selectedItems.length < 3) {
-          // Select item - NO REWARD VALUES REVEALED
-          selectedItems.push({
-            id: itemId,
-            stimulus: stimulus
-          });
-          
-          item.classList.add('selected');
+        let knownHTML, unknownHTML;
+        
+        if (feedbackInfo.chose_known) {
+          // Highlight the known option in green - keep colors consistent
+          knownHTML = `
+            <div class="stimulus-option">
+              ${createFractalHTML(feedbackInfo.known)}
+              <p class="points-text" style="font-size: 16px; font-weight: bold; color: #4CAF50;">${feedbackInfo.known.reward_range[0]}–${feedbackInfo.known.reward_range[1]} Points</p>
+              <p class="action-text" style="color: #4CAF50;"><strong>ACCEPT</strong></p>
+            </div>
+          `;
+          unknownHTML = `
+            <div class="stimulus-option">
+              ${createFractalHTML(feedbackInfo.unknown)}
+              <p class="points-text" style="font-size: 18px; font-weight: bold;">???</p>
+              <p class="action-text"><strong>REVEAL</strong></p>
+            </div>
+          `;
+        } else {
+          // Show revealed value in yellow
+          const range = feedbackInfo.assigned_range;
+          knownHTML = `
+            <div class="stimulus-option">
+              ${createFractalHTML(feedbackInfo.known)}
+              <p class="points-text" style="font-size: 16px; font-weight: bold;">${feedbackInfo.known.reward_range[0]}–${feedbackInfo.known.reward_range[1]} Points</p>
+              <p class="action-text"><strong>ACCEPT</strong></p>
+            </div>
+          `;
+          unknownHTML = `
+            <div class="stimulus-option">
+              ${createFractalHTML(feedbackInfo.unknown)}
+              <p class="points-text" style="font-size: 18px; font-weight: bold; color: #FF9800;">${range[0]}–${range[1]} Points</p>
+              <p class="action-text" style="color: #FF9800;"><strong>REVEAL</strong></p>
+            </div>
+          `;
         }
         
-        // Update counter and show/hide submit button
-        document.getElementById("count").textContent = selectedItems.length;
-        document.getElementById("arena-submit").style.display =
-          selectedItems.length === 3 ? "block" : "none";
-      });
-    });
-    
-    document.getElementById("submit-selection").addEventListener("click", () => {
-      // Only NOW calculate and reveal the actual rewards
-      const points = selectedItems.map(item => {
-        const [min, max] = item.stimulus.reward_range;
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-      });
-      
-      const totalPoints = points.reduce((a, b) => a + b, 0);
-      
-      // End trial with results
-      jsPsych.finishTrial({
-        trial_type: 'arena',
-        selected_stimuli: selectedItems.map(item => item.stimulus.id),
-        selected_was_known: selectedItems.map(item => item.stimulus.unlocked),
-        selected_ranges: selectedItems.map(item => item.stimulus.reward_range),
-        awarded_points: points,
-        total_points: totalPoints
-      });
+        const leftStim = feedbackInfo.known_on_left ? knownHTML : unknownHTML;
+        const rightStim = feedbackInfo.known_on_left ? unknownHTML : knownHTML;
+
+        return `
+          <div class="countdown-display">Trials to Arena: ${trialsLeft}</div>
+          <div class="points-display">Points: ${current_points}</div>
+          <div class="stimulus-container">
+            ${leftStim}
+            ${rightStim}
+          </div>
+          <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); text-align: center;">
+            <p style="font-style: italic; color: #ccc; margin: 0;">Press any key to continue</p>
+          </div>
+        `;
+      },
+      choices: "ALL_KEYS"
     });
   }
-});
+
+  // Arena instructions
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: function() {
+      return `
+        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+          <h2>Welcome to the Arena!</h2>
+          <p>Now you'll face 15 fractals. The mix of known vs unknown depends on how much you explored!</p>
+          <p><strong>Select exactly 3 fractals</strong> to maximize your points.</p>
+          <p>Click on fractals to select them (they'll turn blue when selected).</p>
+          <p><em>Press any key to enter the Arena</em></p>
+        </div>
+      `;
+    },
+    choices: "ALL_KEYS"
+  });
+
+  // Arena trial
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: function() {
+      const ARENA_SIZE = 15;
+      
+      const exploration_rate = total_reveals / total_trials;
+      const known_proportion = exploration_rate;
+      const num_known = Math.max(1, Math.round(ARENA_SIZE * known_proportion));
+      const num_unknown = ARENA_SIZE - num_known;
+      
+      const available_known = unlocked_stimuli.slice(0, num_known);
+      const available_unknown = all_stimuli.filter(s => 
+        !unlocked_stimuli.find(known => known.id === s.id)
+      ).slice(0, num_unknown);
+      
+      arena_stimuli = [...available_known, ...available_unknown];
+      
+      arena_stimuli.forEach(stim => {
+        if (!stim.reward_range) {
+          stim.reward_range = assignRewardRange();
+        }
+      });
+      
+      // Shuffle and store globally
+      window.shuffled_stimuli = jsPsych.randomization.shuffle([...arena_stimuli]);
+      
+      let html = `
+        <h2 style="text-align: center;">Arena - Select 3 Fractals</h2>
+        <p style="text-align: center; color: #ccc;">
+          You revealed ${total_reveals}/${total_trials} unknowns (${Math.round(exploration_rate * 100)}% exploration)
+        </p>
+        <p style="text-align: center; color: #4CAF50;">
+          Known options: ${num_known} | Unknown options: ${num_unknown}
+        </p>
+        <div id="selection-counter" style="text-align: center; margin: 10px 0;">
+          <p>Selected: <span id="count">0</span>/3</p>
+        </div>
+        <div class="arena-grid" id="arena" style="grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr);">
+      `;
+      
+      window.shuffled_stimuli.forEach((stim, index) => {
+        html += `
+          <div class="arena-fractal" data-index="${index}">
+            ${createFractalHTML(stim, 120)}
+          </div>
+        `;
+      });
+      
+      html += `</div>`;
+      html += `
+        <div id="arena-submit" style="text-align: center; margin-top: 20px; display: none;">
+          <button id="submit-selection" style="padding: 10px 20px; font-size: 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">Submit Selection</button>
+        </div>
+      `;
+      
+      return html;
+    },
+    choices: "NO_KEYS",
+    on_load: function() {
+      let selectedItems = [];
+      const shuffled_stimuli = window.shuffled_stimuli;
+      
+      document.querySelectorAll(".arena-fractal").forEach((item, itemIndex) => {
+        item.addEventListener("click", () => {
+          const index = parseInt(item.dataset.index);
+          const stimulus = shuffled_stimuli[index];
+          const itemId = `stimulus_${index}`;
+          
+          if (selectedItems.find(si => si.id === itemId)) {
+            selectedItems = selectedItems.filter(si => si.id !== itemId);
+            item.classList.remove('selected');
+          } else if (selectedItems.length < 3) {
+            selectedItems.push({
+              id: itemId,
+              stimulus: stimulus
+            });
+            
+            item.classList.add('selected');
+          }
+          
+          document.getElementById("count").textContent = selectedItems.length;
+          document.getElementById("arena-submit").style.display =
+            selectedItems.length === 3 ? "block" : "none";
+        });
+      });
+      
+      document.getElementById("submit-selection").addEventListener("click", () => {
+        const points = selectedItems.map(item => {
+          const [min, max] = item.stimulus.reward_range;
+          return Math.floor(Math.random() * (max - min + 1)) + min;
+        });
+        
+        const totalPoints = points.reduce((a, b) => a + b, 0);
+        
+        jsPsych.finishTrial({
+          trial_type: 'arena',
+          selected_stimuli: selectedItems.map(item => item.stimulus.id),
+          selected_was_known: selectedItems.map(item => item.stimulus.unlocked),
+          selected_ranges: selectedItems.map(item => item.stimulus.reward_range),
+          awarded_points: points,
+          total_points: totalPoints
+        });
+      });
+    }
+  });
 
   // Final results
-timeline.push({
-  type: jsPsychHtmlButtonResponse,
-  stimulus: function() {
-    const arena_data = jsPsych.data.get().last(1).values()[0];
-    
-    return `
-      <div style="text-align: center; max-width: 600px; margin: 0 auto;">
-        <h2>Experiment Complete!</h2>
-        <h3>Arena Results:</h3>
-        <p>You earned <strong>${arena_data.total_points}</strong> points in the Arena!</p>
-        <p>Individual selections: ${arena_data.awarded_points.join(', ')} points</p>
-        <h3>Total Experiment Points:</h3>
-        <p>Arena: <strong>${arena_data.total_points}</strong> points</p>
-        <p>Learning phase: <strong>${current_points}</strong> points</p>
-        <p><strong>Grand Total: ${current_points + arena_data.total_points} points</strong></p>
-        <br>
-        <p>Thank you for participating!</p>
-      </div>
-    `;
-  },
-  choices: ['View Data', 'Finish']
-});
+  timeline.push({
+    type: jsPsychHtmlButtonResponse,
+    stimulus: function() {
+      const arena_data = jsPsych.data.get().last(1).values()[0];
+      
+      return `
+        <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+          <h2>Experiment Complete!</h2>
+          <h3>Arena Results:</h3>
+          <p>You earned <strong>${arena_data.total_points}</strong> points in the Arena!</p>
+          <p>Individual selections: ${arena_data.awarded_points.join(', ')} points</p>
+          <h3>Total Experiment Points:</h3>
+          <p>Arena: <strong>${arena_data.total_points}</strong> points</p>
+          <p>Learning phase: <strong>${current_points}</strong> points</p>
+          <p><strong>Grand Total: ${current_points + arena_data.total_points} points</strong></p>
+          <br>
+          <p>Thank you for participating!</p>
+        </div>
+      `;
+    },
+    choices: ['View Data', 'Finish']
+  });
 
   // Run the experiment
   jsPsych.run(timeline);
